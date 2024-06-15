@@ -1,0 +1,26 @@
+%begin
+    %external %routine %spec dumpalllineinfo
+    %external %string(255) %function %spec address2module( %integer anAddress )
+    %own %integer fred = 20
+
+    %routine hacking
+        %integer fredAddress
+        %string(255) mymodule
+
+        fred = fred + 1
+        fredaddress = addr(fred)
+        %signal 15 %if (fred = 27)
+        printstring("fred=".itos(fred,0)." fredAddress=".int2hex(fredAddress,8)); newline
+
+        myModule = address2module( fredAddress )
+        printstring("fred is in module '".myModule."'"); newline
+    %end
+
+    selectoutput( 1 )
+    dumpalllineinfo
+
+    %cycle
+        hacking
+    %repeat
+%end
+%endoffile
