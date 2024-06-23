@@ -1,0 +1,368 @@
+%begin
+    %constant %byte maximising player = 0
+    %constant %byte maximising symbol = 'O'
+
+    %constant %byte minimising player = 1
+    %constant %byte minimising symbol = 'X'
+
+    %constant %byte unused symbol     = '-'
+
+    %constant %byte machine           = maximising player
+    %constant %byte machine symbol    = maximising symbol
+    %constant %byte human             = minimising player
+    %constant %byte human symbol      = minimising symbol
+
+    ! Values to indicate game board layout
+    %constant %byte top left      = 1
+    %constant %byte top centre    = 2
+    %constant %byte top right     = 3
+    %constant %byte middle left   = 4
+    %constant %byte centre        = 5
+    %constant %byte middle right  = 6
+    %constant %byte bottom left   = 7
+    %constant %byte bottom centre = 8
+    %constant %byte bottom right  = 9
+
+    ! Assuming 32-bit integers are used
+    %constant %integer minus infinity = 16_80000000
+    %constant %integer plus infinity  = 16_7fffffff
+
+    %integer game
+    %string(9) game state
+
+    %integer %function max( %integer a, b)
+        %result = b %if (b > a)
+        %result = a
+    %end
+
+    %integer %function min( %integer a, b)
+        %result = b %if (b < a)
+        %result = a
+    %end
+
+    %string(9) %function reset game
+        %integer i
+        %string(9) initial state
+
+        ! clear the game state
+        initial state = ""
+        ! completely populate the game state with the unused symbol
+        %for i = 1,1,9 %cycle
+            initial state = initial state.to string( unused symbol )
+        %repeat
+
+        %result = initial state
+    %end
+
+    %string(32) %function slot2name( %byte slot )
+        %string(32) name
+        %switch sw(0:255)
+
+        -> sw( slot )
+        sw(top left):      name = "top left";          -> esac
+        sw(top centre):    name = "top centre";        -> esac
+        sw(top right):     name = "top right";         -> esac
+        sw(middle left):   name = "middle left";       -> esac
+        sw(centre):        name = "centre";            -> esac
+        sw(middle right):  name = "middle right";      -> esac
+        sw(bottom left):   name = "bottom left";       -> esac
+        sw(bottom centre): name = "bottom centre";     -> esac
+        sw(bottom right):  name = "bottom right";      -> esac
+        sw(*):             name = "an illegal square"; -> esac
+        esac:
+
+        %result = name
+    %end
+
+    %routine show state( %string(9) state )
+        %integer i, j
+        %byte symbol
+        %switch sw(1:9)
+
+        select output( 0 )
+        print string( state )
+        newline
+        newline
+        %for i = 1,1,9 %cycle
+            symbol = charno( state, i )
+            %if (symbol = unused symbol) %then symbol = ' '
+
+            -> sw(i)
+        sw(1): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(2): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(3): print symbol( symbol ); newline
+               print string( "-+-+-" ); newline;            -> esac
+        sw(4): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(5): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(6): print symbol( symbol ); newline
+               print string( "-+-+-" ); newline;            -> esac
+        sw(7): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(8): print symbol( symbol ); print symbol( '|' ); -> esac
+        sw(9): print symbol( symbol ); newline;             -> esac
+        
+        esac:
+        %repeat
+
+        newline
+
+    %end
+
+    %predicate unused slot( %string(9) state, %byte square )
+        %true %if (charno( state , square ) = unused symbol)
+        %false
+    %end
+
+    ! Make a game move by storing player's symbol at given slot
+    %string(9) %function make move( %string(9) state, %byte slot, symbol )
+        %string(9) next state
+
+        next state = state
+        %if (top left <= slot <= bottom right) %start
+            %if unused slot( state , slot ) %start
+                charno( next state, slot ) = symbol
+            %finish %else %start
+                select output( 0 )
+                print string( "Cheating detected! Player " )
+                print symbol( '"' )
+                print symbol( symbol )
+                print symbol( '"' )
+                print string( " tried to overwrite player ")
+                print symbol( '"' )
+                print symbol( charno( state, slot ) )
+                print symbol( '"' )
+                print string( " at square '".slot2name( slot )."'" )
+                new line
+            %finish
+        %finish %else %start
+            select output( 0 )
+            print string( "Cheating detected! Player '" )
+            print symbol( symbol )
+            print string( "' tried to move to '" )
+            print string( slot2name( slot ) )
+            print string( "'" )
+            new line
+            print string( " Only squares 1..9 are valid!" )
+            new line
+        %finish
+        %result = next state
+    %end
+
+    %predicate my slot( %string(9) state, %byte slot id, symbol )
+        %true %if (charno( state, slot id ) = unused symbol)
+        %false
+    %end
+
+    ! Would the player win on their next move?
+    %predicate potential win line( %string(9) state, %byte symbol, p1,p2,p3 )
+        %byte pos 1, pos 2, pos 3
+
+        %predicate free slot( %byte slot id )
+            %true %if (charno( state, slot id ) = unused symbol)
+            %false
+        %end
+
+        %predicate my slot( %byte slot id )
+            %true %if (charno( state, slot id ) = symbol )
+            %false
+        %end
+
+        %true %if free slot( p1 ) %and   my slot( p2 ) %and   my slot( p3 )
+        %true %if   my slot( p1 ) %and free slot( p2 ) %and   my slot( p3 )
+        %true %if   my slot( p1 ) %and   my slot( p2 ) %and free slot( p3 )
+        %false
+    %end
+
+    ! Check for a potential winning line for the player using the given symbol
+    %predicate next move win( %string(9) state, %byte player symbol )
+
+        ! Check for any potential winning lines for player symbol
+
+        ! check for any potential win in a horizontal row for player symbol
+        ! check top row (left,centre,right) == (1,2,3)
+        %true %if potential win line( state, player symbol, 1, 2, 3 )
+
+        ! check middle row (left,centre,right) == (4,5,6)
+        %true %if potential win line( state, player symbol, 4, 5, 6 )
+
+        ! check bottom row (left,centre,right) == (7,8,9)
+        %true %if potential win line( state, player symbol, 7, 8, 9 )
+
+        ! check for any potential win in a vertical column for player symbol
+        ! check left column (top,middle,bottom) == (1,4,7)
+        %true %if potential win line( state, player symbol, 1, 4, 7 )
+
+        ! check middle column (top,middle,bottom) == (2,5,8)
+        %true %if potential win line( state, player symbol, 2, 5, 8 )
+
+        ! check right column (top,middle,bottom) == (3,6,9)
+        %true %if potential win line( state, player symbol, 3, 6, 9 )
+
+        ! check for any potential diagonal win for the player symbol
+        ! check diagonal from top left to bottom right
+        ! diagonal is (top left,middle centre,bottom right) == (1,5,9)
+        %true %if potential win line( state, player symbol, 1, 5, 9 )
+
+        ! check diagonal from top right to bottom left
+        ! diagonal is (top right,middle centre,bottom left) == (3,5,7)
+        %true %if potential win line( state, player symbol, 3, 5, 7 )
+
+        ! no potential win line for symbol player
+        %false
+    %end
+
+    ! Check for a winning line for the player using the given symbol
+    %predicate win line( %string(9) state, %byte symbol, %byte p1,p2,p3 )
+        %byte pos 1, pos 2, pos 3
+
+        pos 1 = charno( state, p1 )
+        pos 2 = charno( state, p2 )
+        pos 3 = charno( state, p3 )
+
+        %true %if (pos 1 = symbol) %and (pos 2 = symbol) %and (pos 3 = symbol)
+        %false
+    %end
+
+    ! Check for a winning line for the player using the given symbol
+    %predicate player win( %string(9) state, %byte player symbol )
+
+        ! Check for any winning lines for player symbol
+
+        ! check for any win in a horizontal row for player symbol
+        ! check top row (left,centre,right) == (1,2,3)
+        %true %if win line( state, player symbol, 1, 2, 3 )
+
+        ! check middle row (left,centre,right) == (4,5,6)
+        %true %if win line( state, player symbol, 4, 5, 6 )
+
+        ! check bottom row (left,centre,right) == (7,8,9)
+        %true %if win line( state, player symbol, 7, 8, 9 )
+
+        ! check for any win in a vertical column for player symbol
+        ! check left column (top,middle,bottom) == (1,4,7)
+        %true %if win line( state, player symbol, 1, 4, 7 )
+
+        ! check middle column (top,middle,bottom) == (2,5,8)
+        %true %if win line( state, player symbol, 2, 5, 8 )
+
+        ! check right column (top,middle,bottom) == (3,6,9)
+        %true %if win line( state, player symbol, 3, 6, 9 )
+
+        ! check for any diagonal win for the player symbol
+        ! check diagonal from top left to bottom right
+        ! diagonal is (top left,centre,bottom right) == (1,5,9)
+        %true %if win line( state, player symbol, 1, 5, 9 )
+
+        ! check diagonal from top right to bottom left
+        ! diagonal is (top right,centre,bottom left) == (3,5,7)
+        %true %if win line( state, player symbol, 3, 5, 7 )
+
+        ! no win line for symbol player
+        %false
+    %end
+
+    %predicate game over( %string(9) state )
+        %integer i
+        %integer unused
+
+        ! Check if there are any unused slots
+        unused = 0
+        %for i = 1,1,9 %cycle
+            unused = unused + 1 %if (charno( state, i ) <> unused symbol)
+        %repeat
+
+        ! there are no unused slots so game must be over
+        %true %if (unused = 0)
+
+        ! there are some unused slots so game is not over
+        %false
+    %end
+
+    %predicate terminal state( %string(9) state )
+
+        ! Check for win lines for maximising player (machine)
+        %true %if player win( state, maximising symbol )
+
+        ! Check for win lines for minimising player
+        %true %if player win( state, minimising symbol )
+
+        ! check to see if the game has reached a state with no more moves
+        %true %if game over( state )
+
+        ! At this point:
+        !    there are no win lines for either player
+        !    and there are more moves to make
+        !    hence this is not a terminal node ( or game state )
+        %false
+    %end
+
+    %integer %function heuristic( %string(9) state )
+        ! check for a current/future win for the maximising player (machine)
+        %result = plus infinity  %if player win( state, machine )
+        %result = plus infinity  %if next move win( state, machine )
+
+        ! check for a current/future win for the minimising player (human)
+        %result = minus infinity %if player win( state, human )
+        %result = minus infinity %if next move win( state, human )
+
+        %result = 0
+    %end
+
+    ! maximising player uses the 'maximising symbol' (machine)
+    ! minimising player uses the 'minimising symbol' (humane)
+    %integer %function minimax( %string(9) state,
+                                %integer depth,
+                                %integer player go )
+        %string(9) new state
+        %integer value, response
+        %integer i
+
+        %if (depth = 0) %or terminal state( state ) %start
+            value = heuristic( state )
+        %finish %else %if (player go = machine) %start
+            ! check possible moves for the maximising player (machine)
+            ! set value = - infinity
+            value = minus infinity
+
+            ! for each potential next game state
+            %for i=1,1,9 %cycle
+                ! find an empty slot
+                %if unused slot( state, i) %start
+                    ! next state after the maximising player (machine) move
+                    new state = make move( state, i, machine symbol )
+                    ! response from the minimising player (human)
+                    response = minimax( new state, depth - 1, human )
+                    value = max( value, response )
+                %finish
+            %repeat
+        %finish %else %start
+            ! Oh! this must be for the minimising player (human)
+            ! set value = + infinity
+            value = plus infinity
+
+            ! for each potential next game state
+            %for i=1,1,9 %cycle
+                %if unused slot( state, i ) %start
+                    ! next state after the minimising player (human) move
+                    new state = make move( state, i, human symbol )
+                    ! response from the maximising player (machine)
+                    response = minimax( new state, depth - 1, machine )
+                    value = min( value, response )
+                %finish
+            %repeat
+        %finish
+        %result = value
+    %end
+
+    ! form the initial game state
+    game state = reset game
+
+    ! make the first move for the minimising player (human)
+    game state = make move( game state, 27, human symbol )
+
+    ! after the first move
+    ! evaluate the game for the maximising player (machine)
+    game = minimax( game state, 4, machine symbol )
+
+    show state( "XO-X--X--")
+%end
+%endoffile
