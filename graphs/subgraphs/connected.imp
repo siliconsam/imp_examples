@@ -1,0 +1,326 @@
+%begin
+    %constinteger max arc = 32
+    %record %format arcfm(%integer from, to, valid)
+    %record(arcfm) %array test case(1:max arc)
+    %integer arc count
+    %integer actual node count
+    %integer sub graph count
+
+    { find the smaller of the two integers }
+    %integer %function min( %integer a,b)
+        %integer c
+
+        { assume that b is smaller }
+        c = b
+        { unless a is smaller }
+        c = a %if (a < b)
+
+        %result = c
+    %end
+
+    { find the larger of the two integers }
+    %integer %function max( %integer a,b)
+        %integer c
+
+        { assume that b is bigger }
+        c = b
+        { unless a is bigger }
+        c = a %if (a > b)
+
+        %result = c
+    %end
+
+    %integer %function create test arcs
+
+        %integer %function add test arc( %integer index, from node, to node )
+            
+            %if (index < max arc) %start
+                index = index + 1
+
+                test case(index)_from = from node
+                test case(index)_to   = to node
+                test case(index)_valid = 1
+            %finish %else %start
+                print string( "FATAL ERROR: Too many arcs for the arc array. Max #arcs='".itos(max arc,0)."'");newlines(2)
+            %finish
+
+            %result = index
+        %end
+
+        arc count = 0
+        arc count = add test arc(arc count, 20, 20)
+        arc count = add test arc(arc count, 21, 23)
+        arc count = add test arc(arc count, 23, 21)
+        arc count = add test arc(arc count, 22, 23)
+        arc count = add test arc(arc count, 24, 25)
+        arc count = add test arc(arc count, 25, 24)
+        arc count = add test arc(arc count, 26, 27)
+
+        %result = arc count
+    %end
+
+    %integer %function get actual node count( %integer arc count, %record(arcfm) %array %name arc)
+        %const %byte used = 1, unused = 0
+        %record %format nodefm( %integer id, %byte free )
+        
+        { Why 2*arc count? }
+        { Because each arc connects 2 nodes }
+        { So 2*arc count ensures we have enough node slots }
+        %record(nodefm) %array node (1:2*arc count)
+        %integer node count = 2*arc count
+        
+        { remember how many nodes are present }
+        %integer actual count
+
+        %routine dump arcs
+            %integer i
+
+            %for i = 1,1,arc count %cycle
+                print string("Arc '".itos(i,0)."'")
+                print string(" from node: '".itos(arc(i)_from,0)."'")
+                print string(" to node  : '".itos(arc(i)_to,0)."'");newline
+            %repeat
+            newline
+        %end
+
+        %routine initialise nodes
+            %integer i
+
+            { Flag the nodes as being unused }
+            %for i=1,1,node count %cycle
+                node(i)_id   = -1
+                node(i)_free = unused
+            %repeat
+
+            { also initialise the node count }
+            actual count = 0
+        %end
+
+        %integer %function get index( %integer id )
+            %integer i, index
+
+            index = 0
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find a matching node slot }
+                    %if (node(i)_free = used) %and (node(i)_id = id) %then index = i
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find an unused slot }
+                    %if (node(i)_free = unused) %then index = i
+
+                    { tag this slot with the node data }
+                    %if (index # 0) %start
+                        { tag this node as used with the requested id }
+                        node(index)_id = id
+                        node(index)_free = used
+                    %finish
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            { Now return the node slot index }
+            %result = index
+        %end
+
+        %routine tag the nodes
+            %integer i
+
+            actual count = 0
+            { Go over the arcs and tag the node as being used }
+            %for i=1,1,arc count %cycle
+                { index is unused }
+                { as get index(id) will add the node id }
+                actual count = max( actual count, get index(arc(i)_from) )
+                actual count = max( actual count, get index(arc(i)_to) )
+            %repeat
+
+        %end
+
+        dump arcs
+        initialise nodes
+
+        { Go over the arcs and tag the node as being used }
+        { it should also return the node count }
+        tag the nodes
+
+        %result = actual count
+    %end
+
+    { Count how many connected sub-graphs are present }
+    %integer %function count Components( %integer node count, arc count, %record(arcfm) %array %name arc)
+        %constbyte unused = 0, used = 1
+        %record %format nodefm (%integer id,colour,graph, %byte free colour, free graph)
+        %record(nodefm) %array node(1:node count)
+
+        %integer %function get colour index( %integer id )
+            %integer i, index
+
+            { assume the node id will be present }
+            index = 0
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find a matching node slot }
+                    %if (node(i)_free colour = used) %and (node(i)_id = id) %then index = i
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find an unused slot }
+                    %if (node(i)_free colour = unused) %then index = i
+
+                    { tag this slot with the node data }
+                    %if (index # 0) %start
+                        { tag this node as used with the requested id }
+                        node(index)_id = id
+                        node(index)_free colour = used
+                    %finish
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            %result = index
+        %end
+
+        %integer %function get graph index( %integer graph )
+            %integer i, index
+
+            { assume the node id will be present }
+            index = 0
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find a matching node slot }
+                    %if (node(i)_free graph = used) %and (node(i)_graph = graph) %then index = i
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            %if (index = 0) %start
+                %for i = 1,1,node count %cycle
+                    { find an unused slot }
+                    %if (node(i)_free graph = unused) %then index = i
+
+                    { tag this slot with the node data }
+                    %if (index # 0) %start
+                        { tag this node as used with the requested id }
+                        node(index)_graph = graph
+                        node(index)_free graph = used
+                    %finish
+
+                    { exit the loop if index found }
+                    %exit %if (index # 0)
+                %repeat
+            %finish
+
+            %result = index
+        %end
+
+        { We use "colour" to indicate which sub-graph a node belongs to }
+        %routine colour nodes
+            %byte again
+            %integer i
+            %integer from node, to node
+            %integer from tag, to tag
+            %integer from colour, to colour, new colour
+
+            { Initialise the nodes }
+            %for i=1,1,node count %cycle
+                node(i)_id            = -1   { set id with bad value }
+                node(i)_colour        = i
+                node(i)_free colour   = unused
+                node(i)_graph         = -1
+                node(i)_free graph    = unused
+            %repeat
+
+            { iterate over the arcs to colour the nodes }
+            %cycle
+                { say not again }
+                again = 0
+                { Tag the nodes }
+                %for i=1,1,arc count %cycle
+                    from node = arc(i)_from
+                    to node   = arc(i)_to
+                    { get the "pointer"/index of the arc nodes }
+                    from tag = get colour index(from node)
+                    to tag   = get colour index(to node)
+                    { get the "colour" of the arc nodes }
+                    from colour = node(from tag)_colour
+                    to colour   = node(to tag)_colour
+
+                    { check if the "colours" match }
+                    %if (from colour # to colour) %start
+                        { Oh! they don't }
+                        { so link the nodes to be the same "colour"/sub-graph } 
+                        new colour = min(from colour, to colour)
+                        node(from tag)_colour = new colour
+                        node(to tag)_colour   = new colour
+
+                        again = 1
+                    %finish
+                %repeat
+
+            %repeat %until (again = 0)
+        %end
+
+        %integer %function get sub graph count( %integer node count )
+            %integer i
+            %integer graph index
+            %integer max graph
+
+            { for each "colour" add it to the node(X)_graph list }
+            %for i = 1,1,node count %cycle
+                %if (node(i)_free colour = used) %start
+                    graph index = get graph index( node(i)_colour )
+                %finish
+            %repeat
+
+            { iterate over the node(X) graph list to get the last sub-graph }
+            max graph = 0
+            %for i=1,1,node count %cycle
+                %if (node(i)_free graph = used) %start
+                    max graph = max graph + 1
+                %finish
+            %repeat
+
+            %result = max graph
+        %end
+
+        { associate each node with a "colour"/sub-graph }
+        colour nodes
+
+        { So find the largest "colour"/sub-graph of the nodes
+        %result = get sub graph count( node count )
+    %end
+
+    arc count = create test arcs
+
+    { determine how many nodes are defined by the arcs }
+    actual node count = get actual node count( arc count, test case )
+
+    { Finally determine the number of connected sub-graphs }
+    sub graph count = count Components( actual node count, arc count, test case )
+
+    print string(" The arc array references '".itos(actual node count,0)."' node")
+    %if (actual node count > 1) %then print symbol('s')
+    print string(" and contains '".itos(sub graph count,0)."' sub-graph")
+    %if (sub graph count > 1) %then print symbol('s')
+    newlines(2)
+
+%end
+%endoffile
