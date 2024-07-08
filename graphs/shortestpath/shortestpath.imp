@@ -1,0 +1,72 @@
+%begin
+    %integer n
+    %record %format flightfm(%integer from,to,cost)
+
+    %integer %function min(%integer a, b)
+        %result = a %if (a < b)
+        %result = b
+    %end
+
+    select input(1)
+    read(n)
+
+    %begin
+        %record(flightfm) %array flights(1:n)
+        %integer i,start,destination,stops, min cost, max cost
+
+        %routine cheapest price( %integer src, dst, stops, cost so far )
+            %integer i
+
+            %if (src = dst) %start
+                min cost = min(min cost, cost so far)
+            %finish %else %if (stops >= 0) %start
+
+                %for i = 1,1,n %cycle
+                    %if (flights(i)_from = src) %start
+                        cheapest price( flights(i)_to, dst, stops - 1, cost so far + flights(i)_cost )
+                    %finish
+                %repeat
+
+            %finish
+            
+        %end
+
+        %for i=1,1,n %cycle
+            read(flights(i)_from)
+            read(flights(i)_to)
+            read(flights(i)_cost)
+        %repeat
+        read(start)
+        read(destination)
+        read(stops)
+
+        select output(0)
+        %for i=1,1,n %cycle
+            print string("Flight(".itos(i,0)."): ");
+            print string(" From: ".itos(flights(i)_from,0))
+            print string("   To: ".itos(flights(i)_to,0))
+            print string(" Cost: ".itos(flights(i)_cost,0))
+            newline
+        %repeat
+        printstring("      Start: ".itos(start,0)); newline
+        printstring("Destination: ".itos(destination,0)); newline
+        printstring("      Stops: ".itos(stops,0)); newline
+        max cost = 0
+        %for i = 1,1,n %cycle
+            max cost = max cost + flights(i)_cost
+        %repeat
+        print string( "Greatest cost: ".itos(max cost,0));newline
+
+        min cost = max cost
+        cheapest price( start, destination, stops, 0 )
+        %if (min cost = max cost) %start
+            print string( "No route found for #hops, start, end points and the given flights data")
+        %finish %else %start
+            print string( "Minimum cost: ".itos(min cost,0))
+        %finish
+        newline
+
+    %end
+
+%end
+%endoffile
