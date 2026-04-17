@@ -1,5 +1,5 @@
 %begin
-    %external %routine %spec dumpalllineinfo
+    %external %routine %spec dumpall lineinfo
     %external %string(255) %function %spec address2module( %integer anAddress )
     %own %integer fred = 20
 
@@ -17,7 +17,7 @@
     %end
 
     selectoutput( 1 )
-    dumpalllineinfo
+    dumpall lineinfo
 
     %cycle
         hacking
